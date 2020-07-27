@@ -85,8 +85,7 @@ public class YourService extends KiboRpcService {
         api.judgeSendStart();
         for(int i=0;i<6;i++){
             try{
-                currentPoint = api.getTrustedRobotKinematics().getPosition();
-                position = moveToPos(currentPoint,posX[i], posY[i], posZ[i], quarX[i], quarY[i], quarZ[i], quarW[i]);
+                position = moveToPos(posX[i], posY[i], posZ[i], quarX[i], quarY[i], quarZ[i], quarW[i]);
                 Log.i(TAG,"Found something : "+position);
                 api.judgeSendDiscoveredQR(i, position);
                 String list[] = position.split(",");   //position is of format pos_x, 3.15
@@ -100,9 +99,8 @@ public class YourService extends KiboRpcService {
 
 
         try{
-            currentPoint = api.getTrustedRobotKinematics().getPosition();
-            api.laserControl(true);
-            moveToPos(currentPoint,posP3[0], posP3[1], posP3[2], posP3[3], posP3[4], posP3[5], 0.7071068);
+            //api.laserControl(true);
+            moveToPos(posP3[0], posP3[1], posP3[2], posP3[3], posP3[4], posP3[5], 0.7071068);
             Log.i(TAG,"Moved to P3");
             api.judgeSendFinishSimulation();
         }
@@ -125,56 +123,33 @@ public class YourService extends KiboRpcService {
     // You can add your method
 
 
-    private String moveToPos(Point currentPoint,double pos_x, double pos_y, double pos_z,
+    private String moveToPos(double pos_x, double pos_y, double pos_z,
                                  double qua_x, double qua_y, double qua_z,
                                  double qua_w) {
 
-        final int LOOP_MAX = 5;
+        //final int LOOP_MAX = 5;
         final Point point = new Point(pos_x, pos_y, pos_z);
         final Quaternion quaternion = new Quaternion((float)qua_x, (float)qua_y,
                 (float)qua_z, (float)qua_w);
 
-
+        //check for collision with KOZ
         for(int i = flag_obstacle;i<KOZ.length;i++){
-            double currentX = currentPoint.getX();
+            Point currentPoint = api.getTrustedRobotKinematics().getPosition();
+
             double currentY = currentPoint.getY();
-            double currentZ = currentPoint.getZ();
+
             //robot moves in the negative y direction, KOZ[][1][1] has the first y co-ordinates of obstacles
             if(currentY>=KOZ[i][1][1] && pos_y<=KOZ[i][1][1]){
 
-                Point obstacle_min = new Point(KOZ[i][0][0],KOZ[i][1][0],KOZ[i][2][0]);
-                Point obstacle_max = new Point(KOZ[i][0][1],KOZ[i][1][1],KOZ[i][2][1]);
-
-                double slopeX = (currentX - pos_x)/(currentY - pos_y);
-
-                double obsStartX = trajectoryLine(slopeX,currentX,currentY,obstacle_max.getY()); //calculate the x value at the start of the obstacle in the trajectory line
-
-                if(obsStartX<obstacle_min.getX() && pos_x<obstacle_min.getX()){
-                    Log.i(TAG,i+"th Obstacle avoided by the trajectory crossing left to the obstacle");
-                    continue;
-                }
-
-                else if(obsStartX>obstacle_max.getX() && pos_x>obstacle_max.getX()){
-                    Log.i(TAG,i+"th Obstacle avoided by the trajectory crossing right to the obstacle");
-                    continue;
-                }
-
-                double slopeZ = (currentZ - pos_z)/(currentY - pos_y);
-
-                double obsStartZ = trajectoryLine(slopeZ,currentZ,currentY,obstacle_max.getY()); //calculate the z value at the start of the obstacle in the trajectory line
-
-                if(obsStartZ<obstacle_min.getZ() && pos_z<obstacle_min.getZ()){
-                    Log.i(TAG,i+"th Obstacle avoided by the trajectory going above the obstacle");
-                    continue;
-                }
-                else if(obsStartZ>obstacle_max.getZ() && pos_z>obstacle_max.getZ()){
-                    Log.i(TAG,i+"th Obstacle avoided by the trajectory going below the obstacle");
-                    continue;
-                }
+                int flag = checkForCollision(i,currentPoint,point);
+                if(flag == 1){continue;}
 
                 Log.i(TAG,"Collided with Keep Out Zone: "+ i);
 
                 try {
+                    Point obstacle_min = new Point(KOZ[i][0][0],KOZ[i][1][0],KOZ[i][2][0]);
+                    Point obstacle_max = new Point(KOZ[i][0][1],KOZ[i][1][1],KOZ[i][2][1]);
+
                     currentPoint = obstacle(currentPoint,obstacle_min, obstacle_max, point);
                     Log.i(TAG,"Avoided Obstacle:"+i+ " Position: " +currentPoint.toString());
                     flag_obstacle =i + 1; //crossed ith obstacle, next time iteration starts from i+1 obstacle
@@ -188,14 +163,8 @@ public class YourService extends KiboRpcService {
             }
         }
 
-
-        Result result = api.moveTo(point, quaternion, true);
-
-        int loopCounter = 0;
-        while(!result.hasSucceeded() || loopCounter < LOOP_MAX){
-            result = api.moveTo(point, quaternion, true);
-            ++loopCounter;
-        }
+        moveBetweenPoints(point,quaternion,5);
+        
         Log.i(TAG,"QR code Position : "+point.toString());
         Bitmap snapshot = api.getBitmapNavCam();
         try{
@@ -255,26 +224,15 @@ public class YourService extends KiboRpcService {
 
         Point newpoint = new Point(currentX,currentY,currentZ);
         Quaternion currentQuarter  = new Quaternion(0,0,(float)0,(float)0);
-        Result result = api.moveTo(newpoint, currentQuarter, true);
-
-        int loopCounter = 0;
-        while(!result.hasSucceeded() || loopCounter < 3){
-            result = api.moveTo(newpoint, currentQuarter, true);
-            ++loopCounter;
-        }
-
-        Log.i(TAG,"Position : "+newpoint.toString());
+        moveBetweenPoints(newpoint,currentQuarter,3);
+        
+        Log.i(TAG,"Obstacle : Position : "+newpoint.toString());
 
         currentY =obstacle_min.getY() - 0.32; //y is negative always and crossing the obstacle
         newpoint = new Point(currentX,currentY,currentZ);
 
-        result = api.moveTo(newpoint, currentQuarter, true);
-
-        loopCounter = 0;
-        while(!result.hasSucceeded() || loopCounter < 3){
-            result = api.moveTo(newpoint, currentQuarter, true);
-            ++loopCounter;
-        }
+        moveBetweenPoints(newpoint,currentQuarter,3);
+        
 
         return newpoint;
 
@@ -284,6 +242,71 @@ public class YourService extends KiboRpcService {
 
     public double trajectoryLine(double slope, double startx, double starty, double endy){
         return startx + slope*(endy - starty);
+    }
+
+
+
+    public int checkForCollision(int i,Point currentPoint, Point point){
+        int flag = 0;
+
+        double currentX = currentPoint.getX();
+        double currentY = currentPoint.getY();
+        double currentZ = currentPoint.getZ();
+
+        double pos_x = point.getX();
+        double pos_y = point.getY();
+        double pos_z = point.getZ();
+
+        Point obstacle_min = new Point(KOZ[i][0][0],KOZ[i][1][0],KOZ[i][2][0]);
+        Point obstacle_max = new Point(KOZ[i][0][1],KOZ[i][1][1],KOZ[i][2][1]);
+
+        double slopeX = (currentX - pos_x)/(currentY - pos_y);
+        double obsStartX = trajectoryLine(slopeX,currentX,currentY,obstacle_max.getY()); //calculate the x value at the start of the obstacle in the trajectory line
+        double obsEndX = trajectoryLine(slopeX,currentX,currentY,obstacle_min.getY());
+
+        double slopeZ = (currentZ - pos_z)/(currentY - pos_y);
+        double obsStartZ = trajectoryLine(slopeZ,currentZ,currentY,obstacle_max.getY()); //calculate the z value at the start of the obstacle in the trajectory line
+        double obsEndZ = trajectoryLine(slopeZ,currentZ,currentY,obstacle_min.getY());
+
+        Point newpoint = new Point(obsEndX,obstacle_min.getY(),obsEndZ); // move to the endpoint of obstacle
+        Quaternion currentQuarter  = new Quaternion(0,0,(float)0,(float)0);
+
+        if(obsStartX + 0.16<obstacle_min.getX() && pos_x<obstacle_min.getX()){
+            moveBetweenPoints(newpoint,currentQuarter,3);
+            Log.i(TAG,i+"th Obstacle avoided by the trajectory crossing left to the obstacle");
+            flag = 1;
+        }
+
+        else if(obsStartX - 0.16>obstacle_max.getX() && pos_x>obstacle_max.getX()){
+            moveBetweenPoints(newpoint,currentQuarter,3);
+            Log.i(TAG,i+"th Obstacle avoided by the trajectory crossing right to the obstacle");
+            flag = 1;
+        }
+
+        if(obsStartZ + 0.16 <obstacle_min.getZ() && pos_z<obstacle_min.getZ()){
+            moveBetweenPoints(newpoint,currentQuarter,3);
+            Log.i(TAG,i+"th Obstacle avoided by the trajectory going above the obstacle");
+            flag = 1;
+        }
+        else if(obsStartZ - 0.16>obstacle_max.getZ() && pos_z>obstacle_max.getZ()){
+            moveBetweenPoints(newpoint,currentQuarter,3);
+            Log.i(TAG,i+"th Obstacle avoided by the trajectory going below the obstacle");
+            flag = 1;
+        }
+
+        return flag;
+    }
+
+    public void moveBetweenPoints(Point newpoint , Quaternion currentQuarter, int LOOPMAX){
+        Result result = api.moveTo(newpoint, currentQuarter, true);
+
+        int loopCounter = 0;
+        while(!result.hasSucceeded() || loopCounter < LOOPMAX){
+            result = api.moveTo(newpoint, currentQuarter, true);
+            ++loopCounter;
+        }
+
+        Log.i(TAG,"MoveBetweenPoints: Position : "+newpoint.toString());
     }
 
 }
