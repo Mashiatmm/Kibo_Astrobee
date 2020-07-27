@@ -125,7 +125,7 @@ public class YourService extends KiboRpcService {
                                  double qua_x, double qua_y, double qua_z,
                                  double qua_w) {
 
-        //final int LOOP_MAX = 5;
+
         final Point point = new Point(pos_x, pos_y, pos_z);
         final Quaternion quaternion = new Quaternion((float)qua_x, (float)qua_y,
                 (float)qua_z, (float)qua_w);
@@ -192,7 +192,6 @@ public class YourService extends KiboRpcService {
 
     public Point obstacle(Point point,Point obstacle_min, Point obstacle_max,Point target){
         double currentZ = point.getZ();
-        double currentY = point.getY();
         double currentX = point.getX();
 
 
@@ -218,7 +217,7 @@ public class YourService extends KiboRpcService {
             currentZ = z_max + 0.22;
         }
 
-        currentY =obstacle_min.getY() + 0.22; //getting infront of the obstacle
+        double currentY =obstacle_min.getY() + 0.22; //getting infront of the obstacle
 
         Point newpoint = new Point(currentX,currentY,currentZ);
         Quaternion currentQuarter  = new Quaternion(0,0,(float)0,(float)0);
@@ -281,7 +280,7 @@ public class YourService extends KiboRpcService {
             flag = 1;
         }
 
-        if(obsStartZ + 0.16 <obstacle_min.getZ() && pos_z<obstacle_min.getZ()){
+        else if(obsStartZ + 0.16 <obstacle_min.getZ() && pos_z<obstacle_min.getZ()){
             moveBetweenPoints(newpoint,currentQuarter,3);
             Log.i(TAG,i+"th Obstacle avoided by the trajectory going above the obstacle");
             flag = 1;
