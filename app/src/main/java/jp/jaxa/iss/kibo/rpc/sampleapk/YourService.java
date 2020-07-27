@@ -80,8 +80,6 @@ public class YourService extends KiboRpcService {
         double []quarZ = {0,0,0,1,0,0};
         double []quarW = {1, 0.7071068, 0.7071068,0,1, 0.7071068};
 
-        Point currentPoint ;  //storing the co-ordinates where Astrobee is placed
-
         api.judgeSendStart();
         for(int i=0;i<6;i++){
             try{
