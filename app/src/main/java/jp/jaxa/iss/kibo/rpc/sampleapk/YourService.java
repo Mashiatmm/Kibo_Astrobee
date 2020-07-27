@@ -244,7 +244,6 @@ public class YourService extends KiboRpcService {
 
 
     public int checkForCollision(int i,Point currentPoint, Point point){
-        int flag = 0;
 
         double currentX = currentPoint.getX();
         double currentY = currentPoint.getY();
@@ -271,27 +270,27 @@ public class YourService extends KiboRpcService {
         if(obsStartX + 0.16<obstacle_min.getX() && pos_x<obstacle_min.getX()){
             moveBetweenPoints(newpoint,currentQuarter,3);
             Log.i(TAG,i+"th Obstacle avoided by the trajectory crossing left to the obstacle");
-            flag = 1;
+            return 1;
         }
 
         else if(obsStartX - 0.16>obstacle_max.getX() && pos_x>obstacle_max.getX()){
             moveBetweenPoints(newpoint,currentQuarter,3);
             Log.i(TAG,i+"th Obstacle avoided by the trajectory crossing right to the obstacle");
-            flag = 1;
+            return 1;
         }
 
         else if(obsStartZ + 0.16 <obstacle_min.getZ() && pos_z<obstacle_min.getZ()){
             moveBetweenPoints(newpoint,currentQuarter,3);
             Log.i(TAG,i+"th Obstacle avoided by the trajectory going above the obstacle");
-            flag = 1;
+            return 1;
         }
         else if(obsStartZ - 0.16>obstacle_max.getZ() && pos_z>obstacle_max.getZ()){
             moveBetweenPoints(newpoint,currentQuarter,3);
             Log.i(TAG,i+"th Obstacle avoided by the trajectory going below the obstacle");
-            flag = 1;
+            return 1;
         }
 
-        return flag;
+        return 0;
     }
 
     public void moveBetweenPoints(Point newpoint , Quaternion currentQuarter, int LOOPMAX){
