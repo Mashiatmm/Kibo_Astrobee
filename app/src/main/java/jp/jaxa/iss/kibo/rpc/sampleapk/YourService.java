@@ -136,6 +136,7 @@ public class YourService extends KiboRpcService {
 
             double currentY = currentPoint.getY();
 
+            if(pos_y > KOZ[i][1][1]) break; //If obstacles come after the target then break the loop
             //robot moves in the negative y direction, KOZ[][1][1] has the first y co-ordinates of obstacles
             if(currentY>=KOZ[i][1][1] && pos_y<=KOZ[i][1][1]){
 
@@ -154,8 +155,6 @@ public class YourService extends KiboRpcService {
                 }catch(Exception ex){
                     Log.e(TAG, "Failed at avoiding obstacle : "+ ex.getMessage());
                 }
-
-
 
 
             }
