@@ -19,6 +19,7 @@ import com.google.zxing.RGBLuminanceSource;
 import com.google.zxing.common.HybridBinarizer;
 
 import static java.lang.Math.abs;
+import java.lang.Math;
 
 /**
  * Class meant to handle commands from the Ground Data System and execute them in Astrobee
@@ -98,8 +99,10 @@ public class YourService extends KiboRpcService {
 
         try{
             //api.laserControl(true);
-            moveToPos(posP3[0], posP3[1], posP3[2], posP3[3], posP3[4], posP3[5], 0.7071068);
-            Log.i(TAG,"Moved to P3");
+            String ARMarker = moveToP3(posP3[0], posP3[1], posP3[2], posP3[3], posP3[4], posP3[5]);
+            Log.i(TAG,"Moved to P3: "+ARMarker);
+            api.judgeSendDiscoveredAR(ARMarker);
+            api.laserControl(true);
             api.judgeSendFinishSimulation();
         }
         catch(Exception ex){
@@ -171,6 +174,63 @@ public class YourService extends KiboRpcService {
             Log.e(TAG, "Error while reading QR code: "+ex.getMessage());
             return null;
         }
+
+    }
+
+    private String moveToP3(double pos_x, double pos_y, double pos_z,
+                             double qua_x, double qua_y, double qua_z) {
+
+
+        final Point point = new Point(pos_x, pos_y, pos_z);
+        float qua_w = (float) Math.sqrt(1 - (Math.pow(qua_x,2)+Math.pow(qua_y,2)+Math.pow(qua_z,2)));
+        final Quaternion quaternion = new Quaternion((float)qua_x, (float)qua_y,
+                (float)qua_z, qua_w);
+
+        for(int i = flag_obstacle;i<KOZ.length;i++){
+            Point currentPoint = api.getTrustedRobotKinematics().getPosition();
+
+            double currentY = currentPoint.getY();
+
+            if(pos_y > KOZ[i][1][1]) break; //If obstacles come after the target then break the loop
+            //robot moves in the negative y direction, KOZ[][1][1] has the first y co-ordinates of obstacles
+            if(currentY>=KOZ[i][1][1] && pos_y<=KOZ[i][1][1]){
+
+                int flag = checkForCollision(i,currentPoint,point);
+                if(flag == 1){continue;}
+
+                Log.i(TAG,"Collided with Keep Out Zone: "+ i);
+
+                try {
+                    Point obstacle_min = new Point(KOZ[i][0][0],KOZ[i][1][0],KOZ[i][2][0]);
+                    Point obstacle_max = new Point(KOZ[i][0][1],KOZ[i][1][1],KOZ[i][2][1]);
+
+                    currentPoint = obstacle(currentPoint,obstacle_min, obstacle_max, point);
+                    Log.i(TAG,"Avoided Obstacle:"+i+ " Position: " +currentPoint.toString());
+                    flag_obstacle =i + 1; //crossed ith obstacle, next time iteration starts from i+1 obstacle
+                }catch(Exception ex){
+                    Log.e(TAG, "Failed at avoiding obstacle : "+ ex.getMessage());
+                }
+
+
+            }
+        }
+
+        String ARMarker = null;
+
+        moveBetweenPoints(point,quaternion,5);
+
+        Log.i(TAG,"AR Position : "+point.toString()+" Quaternion: "+quaternion.toString());
+        Bitmap snapshot = api.getBitmapNavCam();
+        try{
+            ARMarker = readQRCode(snapshot);
+
+        }catch(Exception ex){
+            Log.e(TAG, "Error while reading QR code: "+ex.getMessage());
+        }
+
+        return ARMarker;
+
+
 
     }
 
