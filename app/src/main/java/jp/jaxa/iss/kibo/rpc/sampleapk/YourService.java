@@ -1,6 +1,8 @@
 package jp.jaxa.iss.kibo.rpc.sampleapk;
 
+
 import android.graphics.Bitmap;
+import android.icu.util.RangeValueIterator;
 import android.util.Log;
 
 import jp.jaxa.iss.kibo.rpc.api.KiboRpcService;
@@ -19,7 +21,17 @@ import com.google.zxing.RGBLuminanceSource;
 import com.google.zxing.common.HybridBinarizer;
 
 import static java.lang.Math.abs;
+import static org.opencv.core.CvType.CV_8UC1;
+
 import java.lang.Math;
+import java.util.ArrayList;
+import java.util.List;
+
+
+import org.opencv.aruco.Aruco;
+
+import org.opencv.aruco.Dictionary;
+import org.opencv.core.Mat;
 
 /**
  * Class meant to handle commands from the Ground Data System and execute them in Astrobee
@@ -67,6 +79,7 @@ public class YourService extends KiboRpcService {
 
     };
 
+
     @Override
     protected void runPlan1(){
         String position;
@@ -98,7 +111,6 @@ public class YourService extends KiboRpcService {
 
 
         try{
-            //api.laserControl(true);
             String ARMarker = moveToP3(posP3[0], posP3[1], posP3[2], posP3[3], posP3[4], posP3[5]);
             Log.i(TAG,"Moved to P3: "+ARMarker);
             api.judgeSendDiscoveredAR(ARMarker);
@@ -163,7 +175,14 @@ public class YourService extends KiboRpcService {
             }
         }
 
-        moveBetweenPoints(point,quaternion,5);
+        Point currentPoint = api.getTrustedRobotKinematics().getPosition();
+        double relativeX =  point.getX() - currentPoint.getX();
+        double relativeY = point.getY() - currentPoint.getY();
+        double relativeZ = point.getZ() - currentPoint.getZ();
+
+        Point relativePoint = new Point(relativeX,relativeY,relativeZ);
+
+        RelativemoveBetweenPoints(relativePoint,quaternion,5);
         
         Log.i(TAG,"QR code Position : "+point.toString());
         Bitmap snapshot = api.getBitmapNavCam();
@@ -217,15 +236,28 @@ public class YourService extends KiboRpcService {
 
         String ARMarker = null;
 
-        moveBetweenPoints(point,quaternion,5);
+        Point currentPoint = api.getTrustedRobotKinematics().getPosition();
+        double relativeX = point.getX() - currentPoint.getX();
+        double relativeY = point.getY() - currentPoint.getY() ;
+        double relativeZ = point.getZ() - currentPoint.getZ();
+
+        Point relativePoint = new Point(relativeX,relativeY,relativeZ);
+
+        RelativemoveBetweenPoints(relativePoint,quaternion,5);
 
         Log.i(TAG,"AR Position : "+point.toString()+" Quaternion: "+quaternion.toString());
-        Bitmap snapshot = api.getBitmapNavCam();
+
         try{
-            ARMarker = readQRCode(snapshot);
+        //Log.i(TAG,snapshot.toString());
+            int count = 0;
+            while(ARMarker == null){
+                ARMarker = readArucoMarker();
+                count ++;
+                if(count == 5) break;
+            }
 
         }catch(Exception ex){
-            Log.e(TAG, "Error while reading QR code: "+ex.getMessage());
+            Log.e(TAG, "Error while reading AR Tag: "+ex.getMessage());
         }
 
         return ARMarker;
@@ -246,6 +278,52 @@ public class YourService extends KiboRpcService {
         BinaryBitmap bitmap = new BinaryBitmap(new HybridBinarizer(source));
         com.google.zxing.Result qrCodeResult = new MultiFormatReader().decode(bitmap);
         return qrCodeResult.getText();
+    }
+
+
+    public String readArucoMarker() {
+
+        Mat snapshot = api.getMatNavCam();
+        Dictionary dictionary = Aruco.getPredefinedDictionary(Aruco.DICT_5X5_250);
+        List<Mat> corners = new ArrayList<>();
+        Mat arucoIDs = new Mat();
+        //DetectorParameters parameters = new DetectorParameters();
+        try {
+            Log.i(TAG,"Calling Aruco Detect Markers");
+            Aruco.detectMarkers(snapshot, dictionary, corners, arucoIDs);
+            Log.i(TAG,"Detected Markers ");
+            Log.i(TAG, "ArucoIds : " + arucoIDs.toString());
+            Log.i(TAG, "Corners : " + corners.toString());
+
+            double[] id = arucoIDs.get(0,0);
+            Log.i(TAG, String.valueOf(id));
+            double camera_matrix[] = {344.173397, 0.000000, 630.793795,
+                    0.000000, 344.277922, 487.033834,
+                    0.000000, 0.000000, 1.000000};
+            Mat CamMatrix = new Mat(3, 3, CV_8UC1);
+            CamMatrix.put(3, 3, camera_matrix);
+
+            double dist_coeffs[] = {-0.152963, 0.017530, -0.001107, -0.000210, 0.000000};
+            Mat DistCoeffs = new Mat(1, 5, CV_8UC1);
+            DistCoeffs.put(1, 5, dist_coeffs);
+
+            Mat rvecs = new Mat();
+            Mat tvecs = new Mat();
+            Mat objPoints = new Mat();
+
+            Aruco.estimatePoseSingleMarkers(corners, (float) 0.05, CamMatrix, DistCoeffs, rvecs, tvecs, objPoints);
+            Log.i(TAG, "rvecs: " + rvecs.toString());
+            Log.i(TAG, "tvecs: " + tvecs.toString());
+            Log.i(TAG, "ObjPoints : " + objPoints);
+
+            //Aruco.drawAxis(snapshot, CamMatrix, DistCoeffs, rvecs, tvecs, 0.1f);
+
+            return String.valueOf((int)id[0]);
+
+        }catch(Exception e){
+            Log.e(TAG,"error: " + e.getMessage());
+        }
+        return null;
     }
 
 
@@ -358,6 +436,18 @@ public class YourService extends KiboRpcService {
         int loopCounter = 0;
         while(!result.hasSucceeded() || loopCounter < LOOPMAX){
             result = api.moveTo(newpoint, currentQuarter, true);
+            ++loopCounter;
+        }
+
+        Log.i(TAG,"MoveBetweenPoints: Position : "+newpoint.toString());
+    }
+
+    public void RelativemoveBetweenPoints(Point newpoint , Quaternion currentQuarter, int LOOPMAX){
+        Result result = api.relativeMoveTo(newpoint, currentQuarter, true);
+
+        int loopCounter = 0;
+        while(!result.hasSucceeded() || loopCounter < LOOPMAX){
+            result = api.relativeMoveTo(newpoint, currentQuarter, true);
             ++loopCounter;
         }
 
