@@ -133,9 +133,9 @@ public class YourService extends KiboRpcService {
         // write here your plan 3
     }
 
-    // You can add your method
 
 
+    //MOVE TO P1-1 TO P2-3
     private String moveToPos(double pos_x, double pos_y, double pos_z,
                                  double qua_x, double qua_y, double qua_z,
                                  double qua_w) {
@@ -175,15 +175,11 @@ public class YourService extends KiboRpcService {
             }
         }
 
-        Point currentPoint = api.getTrustedRobotKinematics().getPosition();
-        double relativeX =  point.getX() - currentPoint.getX();
-        double relativeY = point.getY() - currentPoint.getY();
-        double relativeZ = point.getZ() - currentPoint.getZ();
+        //Move to the point
+        moveBetweenPoints(point, quaternion,5);
 
-        Point relativePoint = new Point(relativeX,relativeY,relativeZ);
 
-        RelativemoveBetweenPoints(relativePoint,quaternion,5);
-        
+        //Read QR Code
         Log.i(TAG,"QR code Position : "+point.toString());
         Bitmap snapshot = api.getBitmapNavCam();
         try{
@@ -196,6 +192,8 @@ public class YourService extends KiboRpcService {
 
     }
 
+
+    //MOVING TO P3 AND READING AR TAG
     private String moveToP3(double pos_x, double pos_y, double pos_z,
                              double qua_x, double qua_y, double qua_z) {
 
@@ -205,6 +203,8 @@ public class YourService extends KiboRpcService {
         final Quaternion quaternion = new Quaternion((float)qua_x, (float)qua_y,
                 (float)qua_z, qua_w);
 
+
+        // AVOIDING OBSTACLES
         for(int i = flag_obstacle;i<KOZ.length;i++){
             Point currentPoint = api.getTrustedRobotKinematics().getPosition();
 
@@ -234,19 +234,15 @@ public class YourService extends KiboRpcService {
             }
         }
 
+
         String ARMarker = null;
 
-        Point currentPoint = api.getTrustedRobotKinematics().getPosition();
-        double relativeX = point.getX() - currentPoint.getX();
-        double relativeY = point.getY() - currentPoint.getY() ;
-        double relativeZ = point.getZ() - currentPoint.getZ();
-
-        Point relativePoint = new Point(relativeX,relativeY,relativeZ);
-
-        RelativemoveBetweenPoints(relativePoint,quaternion,5);
+        //Move to P3 Position
+        moveBetweenPoints(point,quaternion,5);
 
         Log.i(TAG,"AR Position : "+point.toString()+" Quaternion: "+quaternion.toString());
 
+        //Read AR Marker
         try{
         //Log.i(TAG,snapshot.toString());
             int count = 0;
@@ -266,7 +262,7 @@ public class YourService extends KiboRpcService {
 
     }
 
-
+    //READ QR TAGS
     public static String readQRCode(Bitmap snapshot)
             throws  NotFoundException {
 
@@ -280,14 +276,14 @@ public class YourService extends KiboRpcService {
         return qrCodeResult.getText();
     }
 
-
+    //READ ARUCO TAGS
     public String readArucoMarker() {
 
         Mat snapshot = api.getMatNavCam();
         Dictionary dictionary = Aruco.getPredefinedDictionary(Aruco.DICT_5X5_250);
         List<Mat> corners = new ArrayList<>();
         Mat arucoIDs = new Mat();
-        //DetectorParameters parameters = new DetectorParameters();
+
         try {
             Log.i(TAG,"Calling Aruco Detect Markers");
             Aruco.detectMarkers(snapshot, dictionary, corners, arucoIDs);
@@ -327,6 +323,7 @@ public class YourService extends KiboRpcService {
     }
 
 
+    //Cross Obstacle
     public Point obstacle(Point point,Point obstacle_min, Point obstacle_max,Point target){
         double currentZ = point.getZ();
         double currentX = point.getX();
@@ -373,13 +370,13 @@ public class YourService extends KiboRpcService {
 
     }
 
-
+    //CALCULATE VALUE OF A LINE
     public double trajectoryLine(double slope, double startx, double starty, double endy){
         return startx + slope*(endy - starty);
     }
 
 
-
+    //Check is a collision happens with any obstacle
     public int checkForCollision(int i,Point currentPoint, Point point){
 
         double currentX = currentPoint.getX();
@@ -430,6 +427,7 @@ public class YourService extends KiboRpcService {
         return 0;
     }
 
+    //MOVE BETWEEN TWO POINTS
     public void moveBetweenPoints(Point newpoint , Quaternion currentQuarter, int LOOPMAX){
         Result result = api.moveTo(newpoint, currentQuarter, true);
 
@@ -442,17 +440,7 @@ public class YourService extends KiboRpcService {
         Log.i(TAG,"MoveBetweenPoints: Position : "+newpoint.toString());
     }
 
-    public void RelativemoveBetweenPoints(Point newpoint , Quaternion currentQuarter, int LOOPMAX){
-        Result result = api.relativeMoveTo(newpoint, currentQuarter, true);
 
-        int loopCounter = 0;
-        while(!result.hasSucceeded() || loopCounter < LOOPMAX){
-            result = api.relativeMoveTo(newpoint, currentQuarter, true);
-            ++loopCounter;
-        }
-
-        Log.i(TAG,"MoveBetweenPoints: Position : "+newpoint.toString());
-    }
 
 }
 
