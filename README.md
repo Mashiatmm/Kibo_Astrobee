@@ -1,5 +1,7 @@
 # Kibo_Astrobee
 
+Competition : https://iss.jaxa.jp/krpc/1st/index.html
+
 We used zxing library for reading QR Tags and opencv library to read AR Tags.
 
 Our movetoPos function moves Astrobee to each QR code's position iteratively while checking and avoiding obstacles with the help of other two functions : CheckforCollision and Obstacle.
